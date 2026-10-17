@@ -1,0 +1,73 @@
+name: Verificar y activar actualización Rev Visión
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Etiqueta a activar (ejemplo v0.4.0)
+        required: true
+        default: v0.4.0
+permissions:
+  contents: write
+concurrency:
+  group: revvision-update-channel
+  cancel-in-progress: false
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verificar archivo publicado, tamaños y SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,io,json,os,re,urllib.request,zipfile
+          from pathlib import Path
+          event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          tag=event.get('release',{}).get('tag_name') or event.get('inputs',{}).get('tag','')
+          if not re.fullmatch(r'v\d{1,5}\.\d{1,5}\.\d{1,5}',tag):
+              raise SystemExit('Etiqueta inválida')
+          candidate=Path('candidates')/(tag+'.json')
+          m=json.loads(candidate.read_text())
+          version=tag[1:]
+          if m.get('format')!=1 or m.get('version')!=version:
+              raise SystemExit('El manifiesto no corresponde a la versión')
+          url=f'https://github.com/fanserick-star/revvision-updates/releases/download/{tag}/RevVision_App_{version}_ACTUALIZACION.zip'
+          if m['package_url']!=url:
+              raise SystemExit('URL de paquete inesperada')
+          req=urllib.request.Request(url,headers={'User-Agent':'RevVisionUpdaterVerifier'})
+          with urllib.request.urlopen(req,timeout=90) as response:
+              package=response.read(45*1024*1024+1)
+          if len(package)>45*1024*1024 or hashlib.sha256(package).hexdigest()!=m['package_sha256']:
+              raise SystemExit('SHA-256 de paquete inválido')
+          with zipfile.ZipFile(io.BytesIO(package)) as z:
+              if sorted(z.namelist())!=['RevVisionApp.exe','release.json']:
+                  raise SystemExit('Contenido ZIP inválido')
+              executable=z.read('RevVisionApp.exe')
+              release=json.loads(z.read('release.json'))
+          if hashlib.sha256(executable).hexdigest()!=m['app_sha256'] or release.get('app_version')!=version or release.get('app_sha256')!=m['app_sha256']:
+              raise SystemExit('SHA-256 del ejecutable o versión incorrecta')
+          if not isinstance(m.get('signature'),str) or len(m['signature'])<70:
+              raise SystemExit('Falta firma del manifiesto')
+          active=Path('update.json')
+          if active.exists():
+              previous=json.loads(active.read_text())['version']
+              if tuple(map(int,version.split('.')))<=tuple(map(int,previous.split('.'))):
+                  print('Canal ya tiene una versión igual o posterior: no se cambia')
+                  raise SystemExit(0)
+          active.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n')
+          print('ZIP y ejecutable verificados:',version)
+          PY
+      - name: Activar manifiesto del launcher
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add update.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Activar versión verificada de Rev Visión"
+            git push origin HEAD:main
+          fi
