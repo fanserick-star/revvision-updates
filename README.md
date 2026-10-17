@@ -1,31 +1,30 @@
-# Rev Visión — Actualizaciones de escritorio
+# Rev Visión — Canal de actualizaciones
 
-Canal exclusivo para **Rev Visión — Óptica y Salud Visual**. No es el sistema de Recepción ni Historia Clínica del Dr. Revelo.
+Repositorio independiente del software **Rev Visión · Óptica y Salud Visual**. No contiene pacientes, historias clínicas, abonos, bases de datos ni credenciales.
 
-## Estado
+## Estado actual
 
-**Versión 0.4.0 preparada, pendiente de su primera GitHub Release.** El launcher no descargará actualizaciones por Internet hasta que exista un paquete público verificado y un archivo `update.json` válido en la rama `main`.
+- **Versión activa del canal: 0.4.0**, verificada en `update.json`.
+- **Versión 0.4.1: candidato en pruebas locales, todavía NO publicado**.
+- La versión 0.4.0 del launcher no admite el nuevo formato de actualización del propio launcher. El paso a 0.4.1 requiere una instalación inicial con el instalador de transición, después de la prueba Windows.
+- A partir de un launcher 0.4.1 validado, el formato firmado 2 permite entregar aplicación, launcher y auxiliar juntos.
 
-## Cómo activar la primera publicación
+## Blindaje de publicación
 
-1. Abrir **[Crear nueva Release](https://github.com/fanserick-star/revvision-updates/releases/new)**.
-2. Introducir etiqueta exacta `v0.4.0`; título `Rev Visión 0.4.0`.
-3. Adjuntar exactamente `RevVision_App_0.4.0_ACTUALIZACION.zip` (aprox. 3,1 MB), **no el instalador ni el código fuente**.
-4. Pulsar **Publish release**. El flujo [Verificar y activar actualización](.github/workflows/activate-release.yml) comprobará el nombre, la versión, los SHA-256 del ZIP y el EXE y publicará `update.json` solo si todo coincide.
-5. Verificar que aparezcan [update.json](https://raw.githubusercontent.com/fanserick-star/revvision-updates/main/update.json) y la [descarga de v0.4.0](https://github.com/fanserick-star/revvision-updates/releases/download/v0.4.0/RevVision_App_0.4.0_ACTUALIZACION.zip).
+Al publicar una GitHub Release, el flujo [Verificar y activar](.github/workflows/activate-release.yml) ejecuta [el verificador](.github/scripts/verify_release.py), que comprueba:
 
-El manifiesto **firmado** de v0.4.0 está guardado provisionalmente en [candidates/v0.4.0.json](candidates/v0.4.0.json). Tener un candidato no habilita la actualización.
+1. Versión y URL fija del paquete del repositorio.
+2. Firma **Ed25519** utilizando solo la [clave pública](keys/release_public.pem).
+3. SHA-256 de ZIP, aplicación y, para formato 2, también launcher y auxiliar.
+4. Archivos exactos del ZIP y versiones en `release.json`.
+5. Ausencia de retroceso respecto de la versión activa.
 
-## Verificación inicial
+**Sólo si pasa todo**, el flujo modifica `update.json`. El archivo candidato por sí solo no publica una actualización. Está prohibido subir claves privadas, datos clínicos o copias de bases de datos.
 
-SHA-256 del ZIP: `64a96ae07ab0e8666f344aefd4ef4c2bfc519c0adf126558d5795169c30485dc`.
+## Fuente única de versiones
 
-La verificación digital Ed25519 la realiza el launcher local antes de aplicar una actualización.
+`VERSION` en el código fuente es la única fuente para la compilación. `build_release.sh` genera nombres de archivo, hashes y manifiesto firmado sin copiar valores manualmente.
 
-## Seguridad y funcionamiento
+## Limitaciones
 
-- **Nunca subir** claves privadas, datos clínicos, inventario de pacientes, bases de datos, copias de seguridad, archivos `.env` ni credenciales.
-- El repositorio es **público** únicamente para el software distribuible y manifiestos de actualizaciones.
-- Para nuevas versiones se necesita una Release nueva, un ZIP distinto, un manifiesto candidato firmado con la misma clave privada y su comprobación.
-- El launcher 0.4.0 **no actualiza si el manifiesto publicado es de la misma versión**. La primera actualización automática real será cuando exista una versión superior publicada y firmada.
-- La app de pruebas mantiene una base **local en cada PC**, todavía sin sincronización. No introducir datos clínicos reales antes de implementar controles de seguridad y respaldos.
+El sistema continúa en pruebas locales y no sincroniza pacientes entre computadoras. El instalador nuevo y el autocambio del launcher requieren comprobación en Windows real antes de declarar producción.
