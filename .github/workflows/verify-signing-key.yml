@@ -1,0 +1,33 @@
+name: Validar secreto de firma Rev Visión
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/verify-signing-key.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar secreto Ed25519 sin revelarlo
+        env:
+          SECRET: ${{ secrets.REVVISION_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,base64,subprocess,sys
+          s=os.environ.get('SECRET','').strip()
+          if not s:
+            sys.exit('Falta configurar REVVISION_SIGNING_KEY')
+          try: key=base64.b64decode(s,validate=True)
+          except Exception:sys.exit('Secreto no es base64 válido')
+          if len(key)!=64:sys.exit('Secreto Ed25519 debe tener 64 bytes')
+          prefix=bytes.fromhex('302e020100300506032b657004220420')
+          proc=subprocess.run(['openssl','pkey','-inform','DER','-pubout','-outform','DER'],input=prefix+key[:32],capture_output=True)
+          if proc.returncode:sys.exit('No se pudo derivar clave pública')
+          expected=subprocess.run(['openssl','pkey','-pubin','-in','keys/release_public.pem','-outform','DER'],capture_output=True)
+          if expected.returncode or proc.stdout!=expected.stdout:sys.exit('Clave de firma NO coincide con el launcher')
+          print('Clave privada configurada y corresponde a la pública. No se mostró el secreto.')
+          PY
