@@ -1,30 +1,31 @@
-# Rev Visión — Canal de actualizaciones
+# Rev Visión — Actualizaciones automáticas
 
-Repositorio independiente del software **Rev Visión · Óptica y Salud Visual**. No contiene pacientes, historias clínicas, abonos, bases de datos ni credenciales.
+Canal exclusivo para **Rev Visión · Óptica y Salud Visual**, independiente de Recepción e Historia Clínica del Dr. Revelo.
 
-## Estado actual
+## Estado comprobado
 
-- **Versión activa del canal: 0.4.0**, verificada en `update.json`.
-- **Versión 0.4.1: candidato en pruebas locales, todavía NO publicado**.
-- La versión 0.4.0 del launcher no admite el nuevo formato de actualización del propio launcher. El paso a 0.4.1 requiere una instalación inicial con el instalador de transición, después de la prueba Windows.
-- A partir de un launcher 0.4.1 validado, el formato firmado 2 permite entregar aplicación, launcher y auxiliar juntos.
+- **Versión pública activa: 0.4.0**, según `update.json`.
+- **Firma privada en GitHub:** comprobada correctamente por [Validar secreto de firma](.github/workflows/verify-signing-key.yml). Nunca se guarda en este repositorio.
+- **Compilación y publicación automáticas:** [build-and-publish.yml](.github/workflows/build-and-publish.yml) ya configurado.
+- **Importación inicial de fuentes 0.4.2:** [import-source.yml](.github/workflows/import-source.yml) ya configurado, pendiente de colocar el único archivo ZIP inicial en `bootstrap/`.
 
-## Blindaje de publicación
+## Primera incorporación (una sola vez)
 
-Al publicar una GitHub Release, el flujo [Verificar y activar](.github/workflows/activate-release.yml) ejecuta [el verificador](.github/scripts/verify_release.py), que comprueba:
+Subir `RevVision_Fuentes_0.4.2_SUBIR_UNA_VEZ.zip` dentro de [bootstrap](bootstrap/). El flujo comprobará su SHA-256 fijo, extraerá las fuentes a `src/`, eliminará el ZIP del árbol de trabajo y ejecutará la compilación de la 0.4.2.
 
-1. Versión y URL fija del paquete del repositorio.
-2. Firma **Ed25519** utilizando solo la [clave pública](keys/release_public.pem).
-3. SHA-256 de ZIP, aplicación y, para formato 2, también launcher y auxiliar.
-4. Archivos exactos del ZIP y versiones en `release.json`.
-5. Ausencia de retroceso respecto de la versión activa.
+Después, los cambios futuros se harán sobre el código de `src/`. Cambiar `src/VERSION` por una versión superior disparará automáticamente el compilador.
 
-**Sólo si pasa todo**, el flujo modifica `update.json`. El archivo candidato por sí solo no publica una actualización. Está prohibido subir claves privadas, datos clínicos o copias de bases de datos.
+## Seguridad de las publicaciones
 
-## Fuente única de versiones
+1. El sistema exige el código completo y ejecuta pruebas Go/JS.
+2. Comprueba que el secreto Ed25519 corresponda a la [clave pública](keys/release_public.pem).
+3. El script del proyecto genera ejecutables, ZIP, versiones y hashes automáticamente desde `src/VERSION`.
+4. GitHub Actions crea y adjunta la Release sin que sea necesario subir ZIP manualmente.
+5. [verify_release.py](.github/scripts/verify_release.py) verifica el ZIP descargado, su firma y sus SHA.
+6. Sólo después se actualiza `update.json`; si falla algo, el canal anterior permanece activo.
 
-`VERSION` en el código fuente es la única fuente para la compilación. `build_release.sh` genera nombres de archivo, hashes y manifiesto firmado sin copiar valores manualmente.
+**Nunca subir:** historias clínicas reales, bases de datos, credenciales, contraseñas, claves privadas ni archivos `.env`.
 
 ## Limitaciones
 
-El sistema continúa en pruebas locales y no sincroniza pacientes entre computadoras. El instalador nuevo y el autocambio del launcher requieren comprobación en Windows real antes de declarar producción.
+El cambio de versión del launcher requiere pruebas reales en Windows. Los datos clínicos siguen siendo locales por computadora, sin sincronización ni autorización para operar con historias clínicas reales. La primera compilación automática aún está pendiente hasta recibir las fuentes.
