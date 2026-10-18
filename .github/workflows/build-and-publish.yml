@@ -11,7 +11,20 @@ concurrency:
   group: revvision-update-channel
   cancel-in-progress: false
 jobs:
+  windows-launcher-check:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.mod
+      - name: Confirmar reapertura de ventana del launcher en Windows
+        working-directory: src
+        run: go test -v ./launcher
   release:
+    needs: windows-launcher-check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
