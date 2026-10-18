@@ -1,0 +1,61 @@
+name: Importar fuentes iniciales Rev Visión
+on:
+  push:
+    branches: [main]
+    paths:
+      - bootstrap/RevVision_Fuentes_0.4.2_SUBIR_UNA_VEZ.zip
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: revvision-source-import
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar el ZIP inicial sin ejecutar contenido
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,pathlib,zipfile,stat,sys
+          archive=pathlib.Path('bootstrap/RevVision_Fuentes_0.4.2_SUBIR_UNA_VEZ.zip')
+          expect='d8d2fcfbe439c115e6c31a0674203e5bdacfae32ed06802b6af3d87456743286'
+          if not archive.is_file() or archive.stat().st_size>3*1024*1024:sys.exit('ZIP faltante o demasiado grande')
+          if hashlib.sha256(archive.read_bytes()).hexdigest()!=expect:sys.exit('SHA-256 incorrecto: no se importó código')
+          required={'src/main.go','src/VERSION','src/build_release.sh','src/go.mod','src/launcher/launcher.go','src/installer/main.go','src/cmd/signrelease/main.go','src/updater/updater.go','src/ui/revvision-logo.png','src/ui/revvision-mark.png'}
+          with zipfile.ZipFile(archive) as z:
+            entries=z.infolist()
+            names=[x.filename for x in entries]
+            if len(names)!=len(set(names)) or len(names)>60:sys.exit('Nombres duplicados o archivos extra')
+            if not required.issubset(names):sys.exit('Faltan archivos de compilación')
+            if sum(x.file_size for x in entries)>3*1024*1024:sys.exit('Contenido demasiado grande')
+            for x in entries:
+              parts=pathlib.PurePosixPath(x.filename).parts
+              if x.is_dir() or not parts or parts[0]!='src' or any(p in ('..','.') for p in parts):sys.exit('Ruta ZIP no permitida')
+              if stat.S_IFMT(x.external_attr>>16)==stat.S_IFLNK:sys.exit('Enlace simbólico no permitido')
+              if x.file_size>1024*1024:sys.exit('Archivo ZIP demasiado grande')
+              if x.filename.endswith(('.env','.pem','.key','.db','.sqlite','.sqlite3')):sys.exit('Archivo no permitido')
+            if z.read('src/VERSION').strip()!=b'0.4.2':sys.exit('Versión inesperada')
+            for x in entries:
+              target=pathlib.Path(x.filename)
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(z.read(x))
+          print('Fuentes 0.4.2 verificadas y extraídas')
+          PY
+      - name: Guardar fuentes y no acumular archivos ZIP
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/
+          git rm -f bootstrap/RevVision_Fuentes_0.4.2_SUBIR_UNA_VEZ.zip
+          git commit -m "Importar fuente verificada de Rev Visión 0.4.2"
+          git push origin HEAD:main
+      - name: Solicitar compilación automática con firmas y SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run build-and-publish.yml --ref main
