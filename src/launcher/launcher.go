@@ -116,6 +116,53 @@ func portOccupied() bool {
 	conn.Close()
 	return true
 }
+// reopenWindow restores the app-mode window when the local server is already
+// healthy. Starting the launcher again must never silently do nothing.
+// The dedicated Edge profile is the same one the application uses.
+func reopenWindow() error {
+	const address = "http://127.0.0.1:58437"
+	root := os.Getenv("LOCALAPPDATA")
+	if root == "" {
+		return errors.New("no se encontro LOCALAPPDATA para mostrar Rev Vision")
+	}
+	profile := filepath.Join(root, "RevVision", "Pruebas", "edge-window-profile")
+	if e := os.MkdirAll(profile, 0700); e != nil {
+		return fmt.Errorf("perfil de ventana: %w", e)
+	}
+	paths := []string{}
+	for _, env := range []string{"PROGRAMFILES(X86)", "PROGRAMFILES", "LOCALAPPDATA"} {
+		if dir := os.Getenv(env); dir != "" {
+			paths = append(paths, filepath.Join(dir, "Microsoft", "Edge", "Application", "msedge.exe"))
+		}
+	}
+	edge := ""
+	for _, path := range paths {
+		if st, e := os.Stat(path); e == nil && !st.IsDir() {
+			edge = path
+			break
+		}
+	}
+	if edge == "" {
+		if path, e := exec.LookPath("msedge.exe"); e == nil {
+			edge = path
+		}
+	}
+	if edge == "" {
+		return errors.New("no se encontro Microsoft Edge para abrir la ventana; mientras tanto usa http://127.0.0.1:58437")
+	}
+	cmd := exec.Command(edge,
+		"--app="+address,
+		"--user-data-dir="+profile,
+		"--no-first-run",
+		"--no-default-browser-check",
+		"--disable-background-mode",
+	)
+	if e := cmd.Start(); e != nil {
+		return fmt.Errorf("no se pudo abrir la ventana de Rev Vision: %w", e)
+	}
+	return cmd.Process.Release()
+}
+
 func updateIfAvailable(base string, local updater.AppRelease) (bool, error) {
 	if portOccupied() {
 		return false, errors.New("Rev Visión está atendiendo, se pospone la actualización")
@@ -190,7 +237,7 @@ func launchAndWait(program, version string) error {
 		if v != version {
 			return fmt.Errorf("ya hay otra versión abierta (%s): no se reemplazará", v)
 		}
-		return nil
+		return reopenWindow()
 	}
 	cmd := exec.Command(filepath.Join(program, "RevVisionApp.exe"))
 	cmd.Dir = program
@@ -297,9 +344,9 @@ func run() error {
 			return errors.New("el puerto de Rev Visión está ocupado por otro programa")
 		}
 		if v != rel.AppVersion {
-			return fmt.Errorf("Rev Visión %s ya está abierto; se pospone actualización", v)
+			report(base, fmt.Sprintf("Servidor existente %s; instalacion local %s. Se pospone actualizar y se muestra la ventana", v, rel.AppVersion))
 		}
-		return nil
+		return reopenWindow()
 	}
 	if updated, err := updateIfAvailable(base, rel); err != nil {
 		report(base, "No se pudo actualizar: "+err.Error())
