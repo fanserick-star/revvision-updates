@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#fff1f7">
+  <title>Rev Visión | Historia Clínica</title>
+  <link rel="icon" type="image/png" href="/revvision-mark.png">
+  <link href="/style.css" rel="stylesheet">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="Rev Visión - Historia Clínica">
+      <img src="/revvision-logo.png" alt="Rev Visión · Óptica y Salud Visual">
+      <div class="brand-divider" aria-hidden="true"></div>
+      <div class="brand-title"><b>Historia Clínica</b><small>Óptica y Salud Visual</small></div>
+    </div>
+    <div class="session"><span class="dot"></span> PRUEBA LOCAL · <span id="appVer">…</span></div>
+  </header>
+  <div class="layout">
+    <nav class="sidenav" aria-label="Navegación principal">
+      <button id="navHome" class="navlink selected"><span class="navicon" aria-hidden="true">⌂</span><span>Inicio</span></button>
+      <button id="navOrders" class="navlink"><span class="navicon" aria-hidden="true">▤</span><span>Pedidos</span></button>
+      <button id="navInventory" class="navlink"><span class="navicon" aria-hidden="true">▦</span><span>Inventario</span></button>
+      <div class="sidenote">Prueba local independiente.<br><strong>No ingresar pacientes reales hasta habilitar la seguridad.</strong></div>
+    </nav>
+    <main id="app"><div class="loading">Iniciando Rev Visión…</div></main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+  <script src="/receipt_print.js" defer></script>
+  <script src="/commerce_ui.js" defer></script>
+</body>
+</html>
