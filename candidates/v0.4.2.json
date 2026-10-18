@@ -1,0 +1,10 @@
+{
+  "format": 2,
+  "version": "0.4.2",
+  "package_url": "https://github.com/fanserick-star/revvision-updates/releases/download/v0.4.2/RevVision_App_0.4.2_ACTUALIZACION.zip",
+  "package_sha256": "76c12592e4e1cff20952d1f5198d1bd752e88ac4658c2dd8bb5f79469ec1a5dc",
+  "app_sha256": "d1326d427c1b9fd1b38346102cc1009b8117b0933ffc297672ed6b5183cbce27",
+  "signature": "Xvc4wNHCUZqLfrbc4nhYv1YxpOY+RTCDxKAeBbqVKg/035PNQAD9ul6nL3TeNyCFMjxrZFkh2eLqoOeA3GmKBw==",
+  "launcher_sha256": "f8d3ac041034e0dcc9f150d766c5efbab715c9712844ac673cbc8d180aadc950",
+  "helper_sha256": "79b5d441edb032c454fae186675a1c1e0f6d75a40ca9d9deda4d1e1b7ee666fd"
+}
