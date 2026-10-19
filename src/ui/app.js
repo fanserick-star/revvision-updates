@@ -12,7 +12,7 @@ let currentPatient=null,currentConsultations=[],dirty=false,screen='home',curren
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function formatDate(v){if(!v)return 'Sin fecha';const match=/^(\d\d\d\d)-(\d\d)-(\d\d)/.exec(v);return match?`${match[3]}/${match[2]}/${match[1]}`:esc(v);}
 function dateNow(){let d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`}
-function msg(text,bad=false){toast.textContent=text;toast.style.background=bad?'#9c2941':'#2c2531';toast.classList.add('show');clearTimeout(msg.timer);msg.timer=setTimeout(()=>toast.classList.remove('show'),5000)}
+function msg(text,bad=false){toast.textContent=text;toast.classList.toggle('toast-error',!!bad);toast.classList.add('show');clearTimeout(msg.timer);msg.timer=setTimeout(()=>toast.classList.remove('show'),5000)}
 async function api(path,method='GET',body){let res=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json','X-RevVision-Client':'revvision-local'},body:body?JSON.stringify(body):undefined});let data=await res.json();if(!res.ok)throw Error(data.error||`Error ${res.status}`);return data}
 async function confirmLeave(){
  if(dirty){
