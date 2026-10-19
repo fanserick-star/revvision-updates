@@ -91,6 +91,7 @@ jobs:
           set -euo pipefail
           go test . ./updater
           node tests/test_receipt_logic.js
+          node tests/test_dialogs.js
       - name: Compilar programa launcher y auxiliar; generar hash y firma
         working-directory: src
         run: bash ./build_release.sh "$GITHUB_WORKSPACE/dist"
