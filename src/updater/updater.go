@@ -166,7 +166,27 @@ func ReadRemoteManifest(urlStr string) (Manifest, error) {
 	}
 	return m, nil
 }
+// DownloadPackage keeps the legacy call for installer and test compatibility.
 func DownloadPackage(m Manifest, dest string) error {
+    return DownloadPackageWithProgress(m, dest, nil)
+}
+type downloadProgressReader struct {
+    reader io.Reader
+    current int64
+    total int64
+    report func(int64,int64)
+}
+func (p *downloadProgressReader) Read(buf []byte) (int,error) {
+    n,e:=p.reader.Read(buf)
+    if n>0 {
+        p.current+=int64(n)
+        if p.report!=nil {p.report(p.current,p.total)}
+    }
+    return n,e
+}
+// DownloadPackageWithProgress reports actual bytes received, never invented
+// percentages. Total is -1 when the server omits Content-Length.
+func DownloadPackageWithProgress(m Manifest, dest string, progress func(int64,int64)) error {
 	req, e := http.NewRequest(http.MethodGet, m.PackageURL, nil)
 	if e != nil {
 		return e
@@ -188,7 +208,9 @@ func DownloadPackage(m Manifest, dest string) error {
 	}
 	defer f.Close()
 	h := sha256.New()
-	n, e := io.Copy(io.MultiWriter(f, h), io.LimitReader(resp.Body, MaxPackageSize+1))
+	if progress!=nil {progress(0,resp.ContentLength)}
+	reader:=&downloadProgressReader{reader:io.LimitReader(resp.Body,MaxPackageSize+1),total:resp.ContentLength,report:progress}
+	n, e := io.Copy(io.MultiWriter(f, h), reader)
 	if e != nil {
 		return e
 	}
@@ -284,6 +306,11 @@ func UnpackVerified(zipPath, stage string, m Manifest) error {
 // StageRemoteRelease downloads to a private staging folder; interrupted attempts
 // are safe to remove ONLY if their contents match the known updater-owned paths.
 func StageRemoteRelease(base string, m Manifest) (string, error) {
+    return StageRemoteReleaseWithProgress(base,m,nil)
+}
+// StageRemoteReleaseWithProgress preserves every signature/ZIP verification and
+// safety check of the original staged installer.
+func StageRemoteReleaseWithProgress(base string,m Manifest,progress func(int64,int64)) (string,error) {
 	if err := removeKnownStage(base); err != nil {
 		return "", err
 	}
@@ -300,7 +327,7 @@ func StageRemoteRelease(base string, m Manifest) (string, error) {
 			_ = os.Remove(zipFile)
 		}
 	}()
-	if err := DownloadPackage(m, zipFile); err != nil {
+	if err := DownloadPackageWithProgress(m, zipFile, progress); err != nil {
 		return "", err
 	}
 	if err := UnpackVerified(zipFile, staging, m); err != nil {
