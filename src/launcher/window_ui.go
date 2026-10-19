@@ -7,7 +7,6 @@ import (
     _ "embed"
     "fmt"
     "image/png"
-    "os"
     "runtime"
     "syscall"
     "time"
