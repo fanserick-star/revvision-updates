@@ -34,6 +34,7 @@ var (
     user32 = syscall.NewLazyDLL("user32.dll")
     gdi32 = syscall.NewLazyDLL("gdi32.dll")
     kernel32 = syscall.NewLazyDLL("kernel32.dll")
+    launcherModule uintptr
     pCreateWindow = user32.NewProc("CreateWindowExW")
     pSendMessage = user32.NewProc("SendMessageW")
     pDefWindowProc = user32.NewProc("DefWindowProcW")
@@ -100,7 +101,7 @@ type launchSplash struct {
 }
 func wide(s string) *uint16 { v,_:=syscall.UTF16PtrFromString(s);return v }
 func callWindow(class, text string, style uint32, x,y,w,h int32, parent uintptr) uintptr {
-    hwnd,_,_:=pCreateWindow.Call(0,uintptr(unsafe.Pointer(wide(class))),uintptr(unsafe.Pointer(wide(text))),uintptr(style),uintptr(x),uintptr(y),uintptr(w),uintptr(h),parent,0,0,0)
+    hwnd,_,_:=pCreateWindow.Call(0,uintptr(unsafe.Pointer(wide(class))),uintptr(unsafe.Pointer(wide(text))),uintptr(style),uintptr(x),uintptr(y),uintptr(w),uintptr(h),parent,0,launcherModule,0)
     return hwnd
 }
 func font(height int32, weight int32) uintptr {
@@ -173,6 +174,7 @@ func (s *launchSplash) loop(){
         if purpleBrush!=0 {pDeleteObject.Call(purpleBrush)}
     }()
     inst,_,_:=kernel32.NewProc("GetModuleHandleW").Call(0)
+    launcherModule=inst
     className:=wide("RevVisionLauncherSplashV1")
     wc:=windowClass{WndProc:globalWindowProc,Instance:inst,Background:whiteBrush,ClassName:className}
     user32.NewProc("RegisterClassW").Call(uintptr(unsafe.Pointer(&wc)))
