@@ -1,10 +1,10 @@
 {
   "format": 2,
-  "version": "0.4.3",
-  "package_url": "https://github.com/fanserick-star/revvision-updates/releases/download/v0.4.3/RevVision_App_0.4.3_ACTUALIZACION.zip",
-  "package_sha256": "10c468ac8908d6b4afd56e9c472110bf1e77d963acab935693c425d0250d37d8",
-  "app_sha256": "04479696c2455a002045191e8a95dfa7aa8d8d4694e2e6365050f9b76ec7c219",
-  "signature": "geTB17aXFqYDG+i2azVQWveTqiT1jCuDfSIJfmzm3Jzmg3NZloLX9IEeBP5Q8z5P+gYlU0rQw6YZBdxz7Q/WAg==",
-  "launcher_sha256": "634c84ea1378749c2891a08c87e6cba4b147f738101acaf8144f09a9d96cc538",
-  "helper_sha256": "10e68c2f06ca85d42e2333f776adb5ef2ac2edb11436031a492cc74ac8fcde66"
+  "version": "0.4.4",
+  "package_url": "https://github.com/fanserick-star/revvision-updates/releases/download/v0.4.4/RevVision_App_0.4.4_ACTUALIZACION.zip",
+  "package_sha256": "aa061cd1bdd60bfb5509c407867f59a6e2d769abf6adff01c00e886798978907",
+  "app_sha256": "7412d179617a1b63f0ea88fb96a7d9dc430aae73110210d518b97c59d9d05e67",
+  "signature": "4gI1f7WJXOnUfI2YiOy0hugNDdMy/sc5Fph9/KhuB77u74bgeYFGKIBdwA6p7jt4DVAjeKCx0wroJMs2IIVSCQ==",
+  "launcher_sha256": "b8602eebe48476a9cd847ce5698e2085a9480e2dc4c1a4b7239b9a559b3ba9f0",
+  "helper_sha256": "d0ac74279eb7d29ff9f4ba72cd10e57c209ad6469e008555d290384e553c7cc2"
 }
