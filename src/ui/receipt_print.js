@@ -207,6 +207,6 @@ async function printReceipt(row, payment, patient, isCopy) {
 async function printThermalTest(){
   const printer=chosenThermalPrinter();
   if(!printer||!revvisionPrinters.includes(printer)){msg('Selecciona la impresora POS-80C / CRM-308 de Windows.',true);return}
-  if(!confirm('¿Enviar una PRUEBA CORTA directamente a '+printer+'? No registra abonos.'))return;
+  if(!await revConfirm({title:'Prueba de impresora',message:'¿Enviar una prueba corta directamente a '+printer+'? Esta operación no registra abonos.',confirmText:'Enviar prueba',cancelText:'Cancelar',kind:'question'}))return;
   try{await api('/print/thermal/test','POST',{printer});msg('Prueba corta enviada a '+printer+'. Confirma si imprimió y cortó.')}catch(err){msg('No se pudo imprimir la prueba: '+err.message,true)}
 }
