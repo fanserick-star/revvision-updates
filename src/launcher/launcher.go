@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"revvision/updater"
+	"revvision/windowcontrol"
 	"strconv"
 	"strings"
 	"syscall"
@@ -121,6 +122,8 @@ func portOccupied() bool {
 // healthy. Starting the launcher again must never silently do nothing.
 // The dedicated Edge profile is the same one the application uses.
 func reopenWindow() error {
+	// Bring the already visible Edge app to the foreground; never create a duplicate.
+	if windowcontrol.ActivateExisting() { return nil }
 	const address = "http://127.0.0.1:58437"
 	root := os.Getenv("LOCALAPPDATA")
 	if root == "" {
@@ -161,7 +164,13 @@ func reopenWindow() error {
 	if e := cmd.Start(); e != nil {
 		return fmt.Errorf("no se pudo abrir la ventana de Rev Vision: %w", e)
 	}
-	return cmd.Process.Release()
+	_ = cmd.Process.Release()
+	// Keep the single-instance launcher lock during Edge startup, so rapid
+	// repeated clicks cannot spawn additional app windows.
+	if !windowcontrol.WaitForExisting(6*time.Second) {
+		return errors.New("Edge no mostró la ventana de Rev Visión; comprueba si está minimizada")
+	}
+	return nil
 }
 
 func updateIfAvailable(base string, local updater.AppRelease) (bool, error) {
@@ -325,6 +334,9 @@ func run() error {
 		return nil
 	}
 	defer syscall.CloseHandle(lock)
+	// Do not show a second transient splash when another launcher is working.
+	launcherSplash = startSplash()
+	defer launcherSplash.close()
 	base, program, e := appPaths()
 	if e != nil {
 		return e
@@ -394,11 +406,8 @@ func run() error {
 	return nil
 }
 func main() {
-	launcherSplash = startSplash()
 	if e := run(); e != nil {
-		if launcherSplash!=nil {launcherSplash.close()}
 		popup("Rev Visión no pudo iniciar.\n\n" + e.Error())
 		os.Exit(1)
 	}
-	if launcherSplash!=nil {launcherSplash.close()}
 }
