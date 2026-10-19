@@ -190,3 +190,64 @@ h2 { font-size:18px; margin:0; }
 /* Historial de pacientes que adquirieron cada artículo */
 .commerce-table td small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
 .commerce-table .row.wrap .btn { min-height:32px; padding:6px 10px; }
+
+/* Confirmaciones propias: eliminan los diálogos del navegador '127.0.0.1 dice'. */
+.rv-dialog {
+  width:min(440px,calc(100vw - 32px));
+  max-width:calc(100vw - 32px);
+  max-height:calc(100vh - 36px);
+  overflow:auto;
+  padding:0;
+  margin:auto;
+  border:1px solid #eddaec;
+  border-radius:20px;
+  color:var(--text);
+  background:#fffafd;
+  box-shadow:0 24px 70px rgba(51,22,63,.27);
+  font-family:'Segoe UI',Arial,sans-serif;
+}
+.rv-dialog::backdrop { background:rgba(37,19,49,.48); backdrop-filter:blur(3px); }
+.rv-dialog-card { padding:25px 26px 23px; }
+.rv-dialog-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px; }
+.rv-dialog-symbol {
+  display:grid;
+  place-items:center;
+  width:49px;
+  height:49px;
+  flex:0 0 49px;
+  border-radius:16px;
+  font-size:24px;
+  font-weight:800;
+  background:#f4e1f5;
+  color:var(--berry);
+}
+.rv-dialog[data-kind="success"] .rv-dialog-symbol { background:#e8f7ef; color:#167e57; }
+.rv-dialog[data-kind="danger"] .rv-dialog-symbol { background:#fff0f1; color:#af3256; }
+.rv-dialog-x {
+  width:32px;
+  height:32px;
+  padding:0;
+  border:0;
+  border-radius:9px;
+  color:#7e7186;
+  background:transparent;
+  font-size:25px;
+  line-height:1;
+}
+.rv-dialog-x:hover { background:#f3e8f4; color:var(--berry); }
+.rv-dialog h2 { margin:0 0 9px; font-size:21px; letter-spacing:-.35px; color:#37203c; }
+.rv-dialog p { margin:0 0 24px; line-height:1.58; font-size:14px; color:#66576c; white-space:pre-line; overflow-wrap:anywhere; }
+.rv-dialog-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
+.rv-dialog-actions .btn { min-height:42px; padding:9px 16px; border-radius:11px; }
+.rv-dialog-actions .rv-dialog-danger { background:#a32d53; border-color:#a32d53; color:#fff; box-shadow:none; }
+.rv-dialog-actions .rv-dialog-danger:hover { background:#872144; }
+.rv-dialog .btn:focus-visible, .rv-dialog-x:focus-visible { outline:3px solid #d070c8; outline-offset:2px; }
+@media (max-width:450px) {
+ .rv-dialog-card { padding:22px 18px; }
+ .rv-dialog-actions { flex-direction:column-reverse; align-items:stretch; }
+ .rv-dialog-actions .btn { width:100%; }
+}
+/* Mensajes pasajeros del mismo sistema; sin ventanas bloqueantes de Edge. */
+#toast { display:none; max-width:min(430px,calc(100vw - 30px)); background:#fff; color:#51305f; border:1px solid #e7d2e8; border-left:5px solid #9b449d; border-radius:13px; box-shadow:0 13px 34px rgba(66,27,76,.16); padding:15px 18px; font-size:13px; line-height:1.45; font-weight:600; }
+#toast.toast-error { background:#fff8fa; border-color:#edc4d0; border-left-color:#b73859; color:#912b49; }
+@media print { .rv-dialog, #toast { display:none!important; } }
