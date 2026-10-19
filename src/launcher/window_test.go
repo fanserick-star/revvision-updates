@@ -1,56 +1,72 @@
 package main
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "runtime"
+    "strings"
+    "syscall"
+    "testing"
+    "time"
+    "unsafe"
 )
 
-// Regression test: when the local server is already running, pressing the
-// desktop shortcut must reopen the dedicated app window instead of exiting.
-func TestReopenWindowUsesDedicatedEdgeApp(t *testing.T) {
-	root := t.TempDir()
-	edge := filepath.Join(root, "Microsoft", "Edge", "Application", "msedge.exe")
-	if err := os.MkdirAll(filepath.Dir(edge), 0755); err != nil {
-		t.Fatal(err)
-	}
-	stub := filepath.Join(root, "edge_stub.go")
-	source := `package main
-import("os";"strings")
-func main(){ _ = os.WriteFile(os.Getenv("REVVISION_EDGE_TEST_MARKER"),[]byte(strings.Join(os.Args[1:],"\\n")),0600) }
+func buildEdgeStub(t *testing.T, root string) string {
+    t.Helper()
+    edge:=filepath.Join(root,"Microsoft","Edge","Application","msedge.exe")
+    if err:=os.MkdirAll(filepath.Dir(edge),0755);err!=nil{t.Fatal(err)}
+    source:=`package main
+import("os";"strings";"syscall";"time";"unsafe")
+func main(){
+    _=os.WriteFile(os.Getenv("REVVISION_EDGE_TEST_MARKER"),[]byte(strings.Join(os.Args[1:],"\\n")),0600)
+    usr:=syscall.NewLazyDLL("user32.dll")
+    klass,_:=syscall.UTF16PtrFromString("STATIC")
+    title,_:=syscall.UTF16PtrFromString("Rev Visión | Historia Clínica")
+    hwnd,_,_:=usr.NewProc("CreateWindowExW").Call(0,uintptr(unsafe.Pointer(klass)),uintptr(unsafe.Pointer(title)),0x10CF0000,10,10,300,150,0,0,0,0)
+    time.Sleep(5*time.Second)
+    if hwnd!=0 {usr.NewProc("DestroyWindow").Call(hwnd)}
+}
 `
-	if err := os.WriteFile(stub, []byte(source), 0600); err != nil {
-		t.Fatal(err)
-	}
-	build := exec.Command("go", "build", "-o", edge, stub)
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("stub Edge: %s: %v", output, err)
-	}
-	appdata := filepath.Join(root, "local")
-	marker := filepath.Join(root, "edge-args.txt")
-	t.Setenv("REVVISION_EDGE_TEST_MARKER", marker)
-	t.Setenv("LOCALAPPDATA", appdata)
-	t.Setenv("PROGRAMFILES(X86)", root)
-	t.Setenv("PROGRAMFILES", filepath.Join(root, "other-program-files"))
-	if err := reopenWindow(); err != nil {
-		t.Fatal(err)
-	}
-	deadline := time.Now().Add(8 * time.Second)
-	for time.Now().Before(deadline) {
-		b, err := os.ReadFile(marker)
-		if err == nil {
-			args := string(b)
-			for _, expected := range []string{"--app=http://127.0.0.1:58437", "--user-data-dir=" + filepath.Join(appdata, "RevVision", "Pruebas", "edge-window-profile"), "--disable-background-mode"} {
-				if !strings.Contains(args, expected) {
-					t.Fatalf("Edge missing %q: %s", expected, args)
-				}
-			}
-			return
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	t.Fatal("Edge app mode was never launched")
+    path:=filepath.Join(root,"edge_stub.go")
+    if err:=os.WriteFile(path,[]byte(source),0600);err!=nil{t.Fatal(err)}
+    command:=exec.Command("go","build","-o",edge,path)
+    if out,err:=command.CombinedOutput();err!=nil{t.Fatalf("stub Edge build: %s: %v",out,err)}
+    return edge
+}
+func TestReopenWindowUsesDedicatedEdgeApp(t *testing.T) {
+    root:=t.TempDir()
+    buildEdgeStub(t,root)
+    marker:=filepath.Join(root,"edge-args.txt")
+    appdata:=filepath.Join(root,"local")
+    t.Setenv("REVVISION_EDGE_TEST_MARKER",marker)
+    t.Setenv("LOCALAPPDATA",appdata)
+    t.Setenv("PROGRAMFILES(X86)",root)
+    t.Setenv("PROGRAMFILES",filepath.Join(root,"other-program-files"))
+    if err:=reopenWindow();err!=nil{t.Fatal(err)}
+    args,err:=os.ReadFile(marker)
+    if err!=nil{t.Fatal(err)}
+    for _,want:=range []string{"--app=http://127.0.0.1:58437","--user-data-dir="+filepath.Join(appdata,"RevVision","Pruebas","edge-window-profile"),"--disable-background-mode"}{
+        if !strings.Contains(string(args),want){t.Errorf("Edge launch missing %q in %q",want,string(args))}
+    }
+}
+func TestReopenWindowFocusesAlreadyVisibleInsteadOfSpawning(t *testing.T) {
+    runtime.LockOSThread()
+    defer runtime.UnlockOSThread()
+    user:=syscall.NewLazyDLL("user32.dll")
+    klass,_:=syscall.UTF16PtrFromString("STATIC")
+    title,_:=syscall.UTF16PtrFromString("Rev Visión | Historia Clínica")
+    hwnd,_,err:=user.NewProc("CreateWindowExW").Call(0,uintptr(unsafe.Pointer(klass)),uintptr(unsafe.Pointer(title)),0x10CF0000,10,10,300,150,0,0,0,0)
+    if hwnd==0 {t.Skipf("No test desktop: %v",err)}
+    defer user.NewProc("DestroyWindow").Call(hwnd)
+    root:=t.TempDir()
+    marker:=filepath.Join(root,"edge-args.txt")
+    t.Setenv("REVVISION_EDGE_TEST_MARKER",marker)
+    // Edge is deliberately NOT installed in this fake environment: reopening
+    // an already visible window must succeed without starting any executable.
+    t.Setenv("PROGRAMFILES(X86)",filepath.Join(root,"none"))
+    t.Setenv("PROGRAMFILES",filepath.Join(root,"none2"))
+    if e:=reopenWindow();e!=nil{t.Fatal(e)}
+    time.Sleep(250*time.Millisecond)
+    if _,e:=os.Stat(marker);e==nil {t.Fatal("Unnecessary second Edge instance spawned")}
 }
