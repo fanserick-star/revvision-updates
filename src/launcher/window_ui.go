@@ -97,6 +97,7 @@ type launchSplash struct {
     ready chan struct{}
     isReady bool
     lastPercent int
+    openedAt time.Time
 }
 func wide(s string) *uint16 { v,_:=syscall.UTF16PtrFromString(s);return v }
 func callWindow(class, text string, style uint32, x,y,w,h int32, parent uintptr) uintptr {
@@ -202,6 +203,7 @@ func (s *launchSplash) loop(){
     useFont(s.percent,fSmall)
     user32.NewProc("ShowWindow").Call(s.hwnd,5)
     user32.NewProc("UpdateWindow").Call(s.hwnd)
+    s.openedAt=time.Now()
     s.isReady=true
     close(s.ready)
     var msg winMessage
@@ -231,6 +233,10 @@ func (s *launchSplash) complete(msg string){
 }
 func (s *launchSplash) close(){
     if s!=nil && s.hwnd!=0 {
+        // Show the launcher long enough to be perceived, but never block a
+        // pending update prompt, real download or patient data access.
+        wait:=1600*time.Millisecond-time.Since(s.openedAt)
+        if wait>0 && wait<1600*time.Millisecond {time.Sleep(wait)}
         user32.NewProc("PostMessageW").Call(s.hwnd,wmClose,0,0)
     }
 }
