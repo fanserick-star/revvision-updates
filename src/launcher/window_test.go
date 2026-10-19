@@ -24,7 +24,12 @@ func main(){
     klass,_:=syscall.UTF16PtrFromString("STATIC")
     title,_:=syscall.UTF16PtrFromString("Rev Visión | Historia Clínica")
     hwnd,_,_:=usr.NewProc("CreateWindowExW").Call(0,uintptr(unsafe.Pointer(klass)),uintptr(unsafe.Pointer(title)),0x10CF0000,10,10,300,150,0,0,0,0)
-    time.Sleep(5*time.Second)
+    stop:=os.Getenv("REVVISION_EDGE_TEST_EXIT")
+    until:=time.Now().Add(7*time.Second)
+    for time.Now().Before(until) {
+        if _,e:=os.Stat(stop);e==nil {break}
+        time.Sleep(50*time.Millisecond)
+    }
     if hwnd!=0 {usr.NewProc("DestroyWindow").Call(hwnd)}
 }
 `
@@ -36,7 +41,20 @@ func main(){
 }
 func TestReopenWindowUsesDedicatedEdgeApp(t *testing.T) {
     root:=t.TempDir()
-    buildEdgeStub(t,root)
+    edge:=buildEdgeStub(t,root)
+    stop:=filepath.Join(root,"edge-exit.txt")
+    t.Setenv("REVVISION_EDGE_TEST_EXIT",stop)
+    t.Cleanup(func(){
+        _=os.WriteFile(stop,[]byte("exit"),0600)
+        // Give the simulated Edge process time to exit before TempDir deletes
+        // its executable (Windows locks running .exe files).
+        for i:=0;i<100;i++ {
+            err:=os.Remove(edge)
+            if err==nil||os.IsNotExist(err){return}
+            time.Sleep(80*time.Millisecond)
+        }
+        t.Error("The fake Edge process did not close after test")
+    })
     marker:=filepath.Join(root,"edge-args.txt")
     appdata:=filepath.Join(root,"local")
     t.Setenv("REVVISION_EDGE_TEST_MARKER",marker)
