@@ -9,7 +9,7 @@ for(const file of scripts){
  const code=fs.readFileSync(path.join(sourceDir,file),'utf8');
  // Compile every browser script, to catch missing awaits/braces before release.
  new vm.Script(code,{filename:file});
- const native=/\\b(?:window\\s*\\.\\s*)?(?:alert|confirm|prompt)\\s*\\(/g;
+ const native=/\b(?:window\s*\.\s*)?(?:alert|confirm|prompt)\s*\(/g;
  assert.equal(native.test(code),false,file+' still contains native popup');
 }
 const index=fs.readFileSync(path.join(sourceDir,'index.html'),'utf8');
