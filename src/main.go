@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+	"revvision/windowcontrol"
 )
 
 //go:embed ui/*
@@ -640,6 +641,8 @@ func openURL(url string) {
 		return
 	}
 	if runtime.GOOS == "windows" {
+		// A second launch should reuse, not duplicate, the independent Edge window.
+		if windowcontrol.ActivateExisting() {return}
 		edge, e := edgeExecutable()
 		if e != nil {
 			log.Printf("No se pudo mostrar la ventana de Rev Vision: %v", e)
@@ -751,7 +754,9 @@ func main() {
 			var info map[string]string
 			_ = json.NewDecoder(resp.Body).Decode(&info)
 			if info["app"] == "RevVision" {
-				openURL("http://" + address)
+				if !windowcontrol.ActivateExisting() {
+					openURL("http://" + address)
+				}
 				return
 			}
 		}
