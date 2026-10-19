@@ -20,9 +20,146 @@ jobs:
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.mod
-      - name: Confirmar reapertura de ventana del launcher en Windows
+      - name: Comprobar una sola ventana, reapertura y compilación en Windows
         working-directory: src
-        run: go test -v ./launcher
+        shell: pwsh
+        run: |
+          go test -v ./windowcontrol
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -v ./launcher
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -run '^
+  release:
+    needs: windows-launcher-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirmar que el codigo fuente esta completo
+        run: |
+          set -euo pipefail
+          for f in src/VERSION src/go.mod src/main.go src/build_release.sh src/launcher/launcher.go src/installer/main.go src/cmd/launcherhelper/main.go src/cmd/signrelease/main.go src/updater/updater.go src/updater/recovery.go src/ui/index.html src/ui/revvision-logo.png src/ui/revvision-mark.png src/ui/app.js src/ui/style.css src/ui/receipt_print.js; do
+            test -s "$f" || { echo "::error::Falta $f; no se publicara ninguna actualizacion"; exit 1; }
+          done
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rechazar versiones repetidas y retrocesos
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          v="$(tr -d '\r\n ' < src/VERSION)"
+          python3 - "$v" <<'PY'
+          import json,sys,re
+          v=sys.argv[1]
+          if not re.fullmatch(r'[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}',v):raise SystemExit('VERSION invalida')
+          published=json.load(open('update.json'))['version']
+          if tuple(map(int,v.split('.'))) <= tuple(map(int,published.split('.'))):
+            raise SystemExit('La nueva version debe ser mayor que '+published)
+          PY
+          if gh release view "v$v" >/dev/null 2>&1; then
+            echo "::error::La Release v$v ya existe y no se sobrescribira"
+            exit 1
+          fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+      - name: Preparar temporalmente la clave de firma y comprobar identidad
+        env:
+          SIGNING_SECRET: ${{ secrets.REVVISION_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_SECRET" || { echo "::error::Falta REVVISION_SIGNING_KEY"; exit 1; }
+          umask 077
+          keyfile="$(mktemp)"
+          printf '%s' "$SIGNING_SECRET" | tr -d '\r\n ' > "$keyfile"
+          chmod 600 "$keyfile"
+          public="$(openssl pkey -pubin -in keys/release_public.pem -outform DER | tail -c 32 | base64 -w0)"
+          actual="$(cd src && go run ./cmd/signrelease pubkey "$keyfile")"
+          if [[ "$public" != "$actual" ]]; then
+            rm -f "$keyfile"
+            echo "::error::La clave de GitHub no coincide con el launcher"
+            exit 1
+          fi
+          echo "REVVISION_SIGNING_KEY=$keyfile" >> "$GITHUB_ENV"
+      - name: Pruebas del programa, datos y actualizador
+        working-directory: src
+        run: |
+          set -euo pipefail
+          go test . ./updater
+          node tests/test_receipt_logic.js
+      - name: Compilar programa launcher y auxiliar; generar hash y firma
+        working-directory: src
+        run: bash ./build_release.sh "$GITHUB_WORKSPACE/dist"
+      - name: Revisar hashes de ejecutables y contenido de ZIP
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          python3 - "$VERSION" <<'PY'
+          import json,sys,hashlib,pathlib,zipfile
+          v=sys.argv[1];p=pathlib.Path('dist');m=json.loads((p/'update.json').read_text())
+          z=p/('RevVision_App_'+v+'_ACTUALIZACION.zip')
+          if m.get('version')!=v or m.get('format')!=2:raise SystemExit('Version o formato no coinciden')
+          if hashlib.sha256(z.read_bytes()).hexdigest()!=m['package_sha256']:raise SystemExit('SHA-256 del ZIP no coincide')
+          with zipfile.ZipFile(z) as f:
+            expected={'RevVisionApp.exe','RevVisionLauncher.exe','LauncherUpdater.exe','release.json'}
+            if len(f.namelist())!=4 or set(f.namelist())!=expected:raise SystemExit('ZIP con archivos inesperados')
+            for name,key in [('RevVisionApp.exe','app_sha256'),('RevVisionLauncher.exe','launcher_sha256'),('LauncherUpdater.exe','helper_sha256')]:
+              if hashlib.sha256(f.read(name)).hexdigest()!=m[key]:raise SystemExit('SHA-256 incorrecto: '+name)
+          PY
+      - name: Registrar manifiesto candidato sin activar canal
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidates
+          cp dist/update.json "candidates/v$VERSION.json"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "candidates/v$VERSION.json"
+          git commit -m "Registrar candidato firmado Rev Vision v$VERSION"
+          git push origin HEAD:main
+      - name: Crear Release y adjuntar ZIP automaticamente
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" "dist/RevVision_App_$(printf %s "$VERSION")_ACTUALIZACION.zip" --title "Rev Vision $VERSION" --notes "Windows. Firma Ed25519 y SHA-256 verificados. Sin datos clinicos."
+      - name: Validar el archivo de descarga publica antes de activar
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          printf '{"inputs":{"tag":"v%s"}}\n' "$VERSION" > /tmp/revvision-release-event.json
+          export GITHUB_EVENT_PATH=/tmp/revvision-release-event.json
+          for attempt in 1 2 3 4 5; do
+            if python3 .github/scripts/verify_release.py; then exit 0; fi
+            if [[ "$attempt" -eq 5 ]]; then
+              echo "::error::Paquete publicado pero NO activado porque fallo la descarga o firma"
+              exit 1
+            fi
+            sleep 8
+          done
+      - name: Activar canal firmado
+        run: |
+          set -euo pipefail
+          git add update.json
+          git commit -m "Activar nueva Rev Vision validada"
+          git push origin HEAD:main
+      - name: Borrar clave efimera
+        if: always()
+        run: |
+          if [[ -n "$REVVISION_SIGNING_KEY" && -f "$REVVISION_SIGNING_KEY" ]]; then
+            shred -u "$REVVISION_SIGNING_KEY" || rm -f "$REVVISION_SIGNING_KEY"
+          fi
+ .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   release:
     needs: windows-launcher-check
     runs-on: ubuntu-latest
