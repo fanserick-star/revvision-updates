@@ -23,6 +23,7 @@ import (
 // Bound at build time. Private signing material never enters the executable.
 var updatePublicKey string
 var launcherBuildVersion string
+var launcherSplash *launchSplash
 
 type channel struct {
 	ManifestURL string `json:"manifest_url"`
@@ -164,6 +165,7 @@ func reopenWindow() error {
 }
 
 func updateIfAvailable(base string, local updater.AppRelease) (bool, error) {
+	if launcherSplash!=nil {launcherSplash.statusText("Buscando actualizaciones…")}
 	if portOccupied() {
 		return false, errors.New("Rev Visión está atendiendo, se pospone la actualización")
 	}
@@ -189,9 +191,16 @@ func updateIfAvailable(base string, local updater.AppRelease) (bool, error) {
 		return false, e
 	}
 	if cmp <= 0 {
+		if launcherSplash!=nil {launcherSplash.statusText("Rev Visión está actualizado")}
 		return false, nil
 	}
-	stage, e := updater.StageRemoteRelease(base, m)
+	if !askToInstall(launcherSplash, local.AppVersion, m.Version) {
+		report(base,"Usuario pospuso actualización "+m.Version+"; se mantiene versión "+local.AppVersion)
+		if launcherSplash!=nil {launcherSplash.statusText("Abriendo versión instalada…")}
+		return false, nil
+	}
+	if launcherSplash!=nil {launcherSplash.statusText("Descargando Rev Visión "+m.Version+"…")}
+	stage, e := updater.StageRemoteReleaseWithProgress(base, m, launcherSplash.progress)
 	if e != nil {
 		return false, e
 	}
@@ -222,7 +231,8 @@ func repairIfRequired(base, program string) error {
 	if e = updater.Verify(m, updatePublicKey); e != nil {
 		return e
 	}
-	stage, e := updater.StageRemoteRelease(base, m)
+	if launcherSplash!=nil {launcherSplash.statusText("Instalando Rev Visión "+m.Version+" por primera vez…")}
+	stage, e := updater.StageRemoteReleaseWithProgress(base, m, launcherSplash.progress)
 	if e != nil {
 		return e
 	}
@@ -384,8 +394,11 @@ func run() error {
 	return nil
 }
 func main() {
+	launcherSplash = startSplash()
 	if e := run(); e != nil {
+		if launcherSplash!=nil {launcherSplash.close()}
 		popup("Rev Visión no pudo iniciar.\n\n" + e.Error())
 		os.Exit(1)
 	}
+	if launcherSplash!=nil {launcherSplash.close()}
 }
