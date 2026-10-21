@@ -251,3 +251,26 @@ h2 { font-size:18px; margin:0; }
 #toast { display:none; max-width:min(430px,calc(100vw - 30px)); background:#fff; color:#51305f; border:1px solid #e7d2e8; border-left:5px solid #9b449d; border-radius:13px; box-shadow:0 13px 34px rgba(66,27,76,.16); padding:15px 18px; font-size:13px; line-height:1.45; font-weight:600; }
 #toast.toast-error { background:#fff8fa; border-color:#edc4d0; border-left-color:#b73859; color:#912b49; }
 @media print { .rv-dialog, #toast { display:none!important; } }
+
+/* Revvision: estado de almacenamiento y panel Neon optativo. */
+#rvConnectionState { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:750; white-space:normal; }
+#rvConnectionState[data-state="online"] { color:#137451; }
+#rvConnectionState[data-state="local"],#rvConnectionState[data-state="afk"] { color:#744a8a; }
+#rvConnectionState[data-state="offline"] { color:#a04d42; }
+.rv-neon { max-width:980px; }
+.rv-neon h2 { color:var(--berry); font-size:19px; margin:7px 0 12px; }
+.rv-neon p { line-height:1.55; }
+.rv-neon a { color:var(--berry); font-weight:750; }
+.rv-neon .field { margin:14px 0; max-width:750px; }
+.rv-neon input { width:100%; max-width:750px; }
+.rv-neon-separator { height:1px; margin:26px 0; background:var(--edge); }
+.rv-keybox { margin-top:19px; border:1px solid #deb9da; background:#fff3fa; border-radius:13px; padding:17px; }
+.rv-keybox textarea { display:block; width:100%; max-width:690px; margin:10px 0; resize:none; padding:13px; border:1px solid #cda7d6; border-radius:9px; }
+.rv-recovery { margin-top:20px; padding:12px 15px; border:1px solid var(--edge); border-radius:12px; background:var(--rose-soft); }
+.rv-recovery summary { color:var(--berry); font-weight:800; cursor:pointer; }
+.rv-neon-note { margin-top:20px; font-size:12px; }
+@media(max-width:760px){
+ .session{font-size:10px;white-space:normal;text-align:right;}
+ .topbar{padding:7px 12px;}
+ #rvConnectionState{font-size:10px;}
+}
