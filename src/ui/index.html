@@ -15,14 +15,15 @@
       <div class="brand-divider" aria-hidden="true"></div>
       <div class="brand-title"><b>Historia Clínica</b><small>Óptica y Salud Visual</small></div>
     </div>
-    <div class="session"><span class="dot"></span> PRUEBA LOCAL · <span id="appVer">…</span></div>
+    <div class="session"><span class="dot"></span><span id="rvConnectionState" data-state="local" role="status" aria-live="polite">Guardado local · Comprobando Neon…</span> · <span id="appVer">…</span></div>
   </header>
   <div class="layout">
     <nav class="sidenav" aria-label="Navegación principal">
       <button id="navHome" class="navlink selected"><span class="navicon" aria-hidden="true">⌂</span><span>Inicio</span></button>
       <button id="navOrders" class="navlink"><span class="navicon" aria-hidden="true">▤</span><span>Pedidos</span></button>
       <button id="navInventory" class="navlink"><span class="navicon" aria-hidden="true">▦</span><span>Inventario</span></button>
-      <div class="sidenote">Prueba local independiente.<br><strong>No ingresar pacientes reales hasta habilitar la seguridad.</strong></div>
+      <button id="navNeon" class="navlink"><span class="navicon" aria-hidden="true">☁</span><span>Nube Neon</span></button>
+      <div class="sidenote">Información guardada en esta computadora.<br><strong>Respaldo cifrado Neon opcional. Protege el acceso a Windows.</strong></div>
     </nav>
     <main id="app"><div class="loading">Iniciando Rev Visión…</div></main>
   </div>
@@ -31,5 +32,7 @@
   <script src="/app.js" defer></script>
   <script src="/receipt_print.js" defer></script>
   <script src="/commerce_ui.js" defer></script>
+  <script src="/neon_ui.js" defer></script>
+  <script src="/connection_status.js" defer></script>
 </body>
 </html>
