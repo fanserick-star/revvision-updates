@@ -212,9 +212,10 @@ func (s *Store) save(next Database) error {
 		// Windows MoveFileEx may not replace an existing file; keep last-good, then perform replace with recovery.
 		backup := s.file + ".last-good"
 		old, err := os.ReadFile(s.file)
-		if err != nil {
-			return err
-		}
+		if err != nil {return err}
+		// Additional immutable daily recovery point. Failure is logged but
+		// never interrupts the primary atomic save operation.
+		if e:=rvDailyCheckpoint(s.file,old);e!=nil{log.Printf("Respaldo local diario no completado: %v",e)}
 		bf, err := os.CreateTemp(dir, ".last-good-*.tmp")
 		if err != nil {
 			return err
@@ -441,6 +442,8 @@ func (s *Store) handler(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "Petición bloqueada")
 		return
 	}
+	if s.rvBackupHandler(w,r) {return}
+	if s.neonHandler(w,r) {return}
 	if s.thermalHandler(w, r) {
 		return
 	}
@@ -448,7 +451,7 @@ func (s *Store) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/api/health" {
-		jsonReply(w, 200, map[string]string{"app": "RevVision", "version": appVersion, "storage": "LOCAL-TEST"})
+		jsonReply(w, 200, map[string]string{"app": "RevVision", "version": appVersion, "storage": "LOCAL-OFFLINE"})
 		return
 	}
 	if r.URL.Path == "/api/patients" {
@@ -797,13 +800,18 @@ func main() {
 		http.FileServer(http.FS(uiFS)).ServeHTTP(w, r)
 	}))
 	server.Handler = mux
+	// Background service only uploads ciphertext when owner explicitly enables
+	// encrypted backups and activity is recent; AFK performs no Neon calls.
+	cloudCtx, cloudCancel := context.WithCancel(context.Background())
+	defer cloudCancel()
+	go rvBackgroundBackup(cloudCtx,s)
 	go func() {
 		<-onWindowClosed
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(ctx)
 	}()
-	log.Printf("REV VISION %s | MODO PRUEBAS LOCAL | %s", appVersion, address)
+	log.Printf("REV VISION %s | almacenamiento local y Neon opcional | %s", appVersion, address)
 	go func() { time.Sleep(300 * time.Millisecond); openURL("http://" + address) }()
 	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
