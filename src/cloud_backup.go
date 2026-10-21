@@ -10,7 +10,7 @@ const rvIdleAfter=8*time.Minute
 const rvMinimumBackup=15*time.Minute
 var rvHashPattern=regexp.MustCompile(`^[0-9a-f]{64}$`)
 type rvEncrypted struct{Format int `json:"format"`; Nonce string `json:"nonce"`; Data string `json:"data"`}
-type rvBackupMeta struct{Fingerprint string `json:"fingerprint"`;LastSuccess string `json:"last_success"`}
+type rvBackupMeta struct{Fingerprint string `json:"fingerprint"`;LastSuccess string `json:"last_success"`;Target string `json:"target"`}
 var rvBackupState=struct{sync.Mutex; LastActivity time.Time;LastAttempt time.Time;LastError string}{LastActivity:time.Now()}
 
 func rvBackupKey()(key []byte,err error){
@@ -64,7 +64,10 @@ func rvSendBackup(ctx context.Context,s *Store)(bool,error){
  owner,e:=rvOwner();if e!=nil{return false,e}
  db,e:=rvDatabaseBytes(s);if e!=nil{return false,e}
  digest:=sha256.Sum256(db);hash:=hex.EncodeToString(digest[:])
- if hash==rvReadMeta().Fingerprint{return false,nil}
+ u,e:=rvParseURL(conn);if e!=nil{return false,e}
+ target:=u.Hostname()+u.Path+"@"+owner
+ meta:=rvReadMeta()
+ if hash==meta.Fingerprint&&target==meta.Target{return false,nil}
  check,e:=rvQueryCall(ctx,conn,"SELECT owner_id FROM revvision.ownership WHERE id=1")
  if e!=nil{return false,e}
  if rvRow(check,"owner_id")!=owner{return false,errors.New("Neon pertenece a otra instalación; se bloqueó el envío")}
@@ -73,7 +76,7 @@ func rvSendBackup(ctx context.Context,s *Store)(bool,error){
  if e!=nil{return false,e}
  // Old versions are pruned only after successful insertion. Keep last 8.
  _,_=rvQueryCall(ctx,conn,`DELETE FROM revvision.encrypted_backups WHERE id IN (SELECT id FROM revvision.encrypted_backups WHERE owner_id=$1 ORDER BY id DESC OFFSET 8)`,owner)
- _=rvWriteMeta(rvBackupMeta{Fingerprint:hash,LastSuccess:time.Now().UTC().Format(time.RFC3339)})
+ _=rvWriteMeta(rvBackupMeta{Fingerprint:hash,Target:target,LastSuccess:time.Now().UTC().Format(time.RFC3339)})
  rvBackupState.Lock();rvBackupState.LastError="";rvBackupState.Unlock()
  return true,nil
 }
