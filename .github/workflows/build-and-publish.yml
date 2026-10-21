@@ -28,6 +28,7 @@ jobs:
           go test -v ./windowcontrol
           go test -v ./launcher
           go test -run NoTestsCompileOnly .
+          go test -run 'TestRV' .
   release:
     needs: windows-launcher-check
     runs-on: ubuntu-latest
@@ -92,6 +93,7 @@ jobs:
           go test . ./updater
           node tests/test_receipt_logic.js
           node tests/test_dialogs.js
+          node tests/test_neon_ui.js
       - name: Compilar programa launcher y auxiliar; generar hash y firma
         working-directory: src
         run: bash ./build_release.sh "$GITHUB_WORKSPACE/dist"
