@@ -157,7 +157,13 @@ func (s *Store) rvBackupHandler(w http.ResponseWriter,r *http.Request)bool{
  case "/api/neon/backup/status":
   if r.Method!="GET"{fail(w,405,"Método no permitido");return true}
   _,e:=rvBackupKey();rvBackupState.Lock();idle:=time.Since(rvBackupState.LastActivity)>=rvIdleAfter;lastErr:=rvBackupState.LastError;rvBackupState.Unlock()
-  jsonReply(w,200,map[string]interface{}{"enabled":e==nil,"ready":rvBackupReady(),"afk":idle,"last_backup":rvReadMeta().LastSuccess,"last_error":lastErr,"mode":"encrypted-backup-one-workstation"})
+  meta:=rvReadMeta();lastBackup:=""
+  if conn,err:=rvCredential();err==nil{
+   if u,err:=rvParseURL(conn);err==nil{
+    if owner,err:=rvOwner();err==nil && meta.Target==u.Hostname()+u.Path+"@"+owner {lastBackup=meta.LastSuccess}
+   }
+  }
+  jsonReply(w,200,map[string]interface{}{"enabled":e==nil,"ready":rvBackupReady(),"afk":idle,"last_backup":lastBackup,"last_error":lastErr,"mode":"encrypted-backup-one-workstation"})
  case "/api/neon/backup/enable":
   if r.Method!="POST"{fail(w,405,"Método no permitido");return true}
   conn,e:=rvCredential();if e!=nil{fail(w,400,"Vincula primero Neon");return true}
