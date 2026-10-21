@@ -11,6 +11,12 @@ type rvRows struct{Rows []map[string]json.RawMessage `json:"rows"`}
 type rvRequest struct{ConnectionURL string `json:"connection_url"`}
 type rvQueryRequest struct{Query string `json:"query"`;Params []string `json:"params"`}
 var rvHTTPClient=&http.Client{Timeout:12*time.Second,CheckRedirect:func(*http.Request,[]*http.Request)error{return http.ErrUseLastResponse}}
+const rvExistingProjectName="Rev Vision - Pruebas"
+const rvExistingProjectID="patient-band-99801930"
+const rvExistingDatabase="revvision"
+const rvExistingHost="ep-floral-glitter-akndkswe.c-3.us-west-2.aws.neon.tech"
+const rvExistingPoolerHost="ep-floral-glitter-akndkswe-pooler.c-3.us-west-2.aws.neon.tech"
+
 
 func rvParseURL(raw string)(*url.URL,error){
  if len(raw)<35||len(raw)>4000||strings.ContainsAny(raw," \t\r\n\x00"){return nil,errors.New("Copia la URL PostgreSQL completa de Neon")}
@@ -24,6 +30,15 @@ func rvParseURL(raw string)(*url.URL,error){
  if strings.Trim(u.Path,"/")==""||strings.Contains(strings.TrimPrefix(u.Path,"/"),"/"){return nil,errors.New("Selecciona una base de datos Neon")}
  if u.Query().Get("sslmode")!="require"&&u.Query().Get("sslmode")!="verify-full"{return nil,errors.New("Agrega sslmode=require a la conexión")}
  if u.Fragment!=""{return nil,errors.New("URL Neon no debe incluir fragmento")}
+ // The official Revvision must never bind silently to the Neon used by the
+ // doctor's Reception or to a different clinic. Endpoint identifiers are
+ // public metadata, not the password or the connection string.
+ if host!=rvExistingHost&&host!=rvExistingPoolerHost {
+  return nil,errors.New("Esta no es la cuenta Neon oficial de Revvision. Usa el proyecto Rev Vision - Pruebas")
+ }
+ if strings.TrimPrefix(u.Path,"/")!=rvExistingDatabase {
+  return nil,errors.New("La base debe ser revvision dentro del proyecto Rev Vision - Pruebas")
+ }
  return u,nil
 }
 func rvQueryHTTP(ctx context.Context, client *http.Client,endpoint,conn,sql string,params ...string)(rvRows,error){
@@ -113,9 +128,9 @@ func (s *Store) neonHandler(w http.ResponseWriter,r *http.Request)bool{
  case "/api/neon/status":
   if r.Method!="GET"{fail(w,405,"Método no permitido");return true}
   raw,e:=rvCredential()
-  if e!=nil{jsonReply(w,200,map[string]interface{}{"linked":false,"mode":"local","message":"Guardado local, sin cuenta Neon"});return true}
+  if e!=nil{jsonReply(w,200,map[string]interface{}{"linked":false,"mode":"local","message":"Guardado local, sin cuenta Neon","project":rvExistingProjectName,"project_id":rvExistingProjectID,"database":rvExistingDatabase});return true}
   u,_:=rvParseURL(raw)
-  jsonReply(w,200,map[string]interface{}{"linked":true,"host":u.Hostname(),"database":strings.TrimPrefix(u.Path,"/"),"mode":"optional-backup","message":"Cuenta vinculada; datos locales prioritarios"})
+  jsonReply(w,200,map[string]interface{}{"linked":true,"host":u.Hostname(),"database":strings.TrimPrefix(u.Path,"/"),"mode":"optional-backup","message":"Cuenta del proyecto Rev Vision - Pruebas vinculada; datos locales prioritarios","project":rvExistingProjectName,"project_id":rvExistingProjectID})
  case "/api/neon/test","/api/neon/link":
   if r.Method!="POST"{fail(w,405,"Método no permitido");return true}
   var request rvRequest;if e:=receive(r,&request);e!=nil{fail(w,400,"Conexión Neon inválida");return true}
