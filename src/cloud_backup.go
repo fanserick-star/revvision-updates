@@ -10,7 +10,19 @@ const rvIdleAfter=8*time.Minute
 const rvMinimumBackup=15*time.Minute
 var rvHashPattern=regexp.MustCompile(`^[0-9a-f]{64}$`)
 type rvEncrypted struct{Format int `json:"format"`; Nonce string `json:"nonce"`; Data string `json:"data"`}
-type rvBackupMeta struct{Fingerprint string `json:"fingerprint"`;LastSuccess string `json:"last_success"`;Target string `json:"target"`}
+type rvBackupCounts struct{
+ Patients int `json:"patients"`; Consultations int `json:"consultations"`;
+ Products int `json:"inventory_products"`; Orders int `json:"orders"`; Payments int `json:"payments"`
+}
+type rvBackupMeta struct{Fingerprint string `json:"fingerprint"`;LastSuccess string `json:"last_success"`;Target string `json:"target"`;Counts rvBackupCounts `json:"counts"`}
+func rvSnapshotCounts(data []byte)(rvBackupCounts,error){
+ var db Database
+ if err:=json.Unmarshal(data,&db);err!=nil{return rvBackupCounts{},err}
+ if db.Schema!=2||db.Patients==nil||db.Consultations==nil||db.Products==nil||db.Orders==nil||db.Payments==nil {
+  return rvBackupCounts{},errors.New("Respaldo contiene esquema incompleto; no fue enviado")
+ }
+ return rvBackupCounts{len(db.Patients),len(db.Consultations),len(db.Products),len(db.Orders),len(db.Payments)},nil
+}
 var rvBackupState=struct{sync.Mutex; LastActivity time.Time;LastAttempt time.Time;LastError string}{LastActivity:time.Now()}
 
 func rvBackupKey()(key []byte,err error){
@@ -63,6 +75,7 @@ func rvSendBackup(ctx context.Context,s *Store)(bool,error){
  key,e:=rvBackupKey();if e!=nil{return false,e}
  owner,e:=rvOwner();if e!=nil{return false,e}
  db,e:=rvDatabaseBytes(s);if e!=nil{return false,e}
+ counts,e:=rvSnapshotCounts(db);if e!=nil{return false,e}
  digest:=sha256.Sum256(db);hash:=hex.EncodeToString(digest[:])
  u,e:=rvParseURL(conn);if e!=nil{return false,e}
  target:=u.Hostname()+u.Path+"@"+owner
@@ -76,7 +89,7 @@ func rvSendBackup(ctx context.Context,s *Store)(bool,error){
  if e!=nil{return false,e}
  // Old versions are pruned only after successful insertion. Keep last 8.
  _,_=rvQueryCall(ctx,conn,`DELETE FROM revvision.encrypted_backups WHERE id IN (SELECT id FROM revvision.encrypted_backups WHERE owner_id=$1 ORDER BY id DESC OFFSET 8)`,owner)
- _=rvWriteMeta(rvBackupMeta{Fingerprint:hash,Target:target,LastSuccess:time.Now().UTC().Format(time.RFC3339)})
+ _=rvWriteMeta(rvBackupMeta{Fingerprint:hash,Target:target,Counts:counts,LastSuccess:time.Now().UTC().Format(time.RFC3339)})
  rvBackupState.Lock();rvBackupState.LastError="";rvBackupState.Unlock()
  return true,nil
 }
@@ -157,13 +170,13 @@ func (s *Store) rvBackupHandler(w http.ResponseWriter,r *http.Request)bool{
  case "/api/neon/backup/status":
   if r.Method!="GET"{fail(w,405,"Método no permitido");return true}
   _,e:=rvBackupKey();rvBackupState.Lock();idle:=time.Since(rvBackupState.LastActivity)>=rvIdleAfter;lastErr:=rvBackupState.LastError;rvBackupState.Unlock()
-  meta:=rvReadMeta();lastBackup:=""
+  meta:=rvReadMeta();lastBackup:="";counts:=rvBackupCounts{}
   if conn,err:=rvCredential();err==nil{
    if u,err:=rvParseURL(conn);err==nil{
-    if owner,err:=rvOwner();err==nil && meta.Target==u.Hostname()+u.Path+"@"+owner {lastBackup=meta.LastSuccess}
+    if owner,err:=rvOwner();err==nil && meta.Target==u.Hostname()+u.Path+"@"+owner {lastBackup=meta.LastSuccess;counts=meta.Counts}
    }
   }
-  jsonReply(w,200,map[string]interface{}{"enabled":e==nil,"ready":rvBackupReady(),"afk":idle,"last_backup":lastBackup,"last_error":lastErr,"mode":"encrypted-backup-one-workstation"})
+  jsonReply(w,200,map[string]interface{}{"enabled":e==nil,"ready":rvBackupReady(),"afk":idle,"last_backup":lastBackup,"coverage":counts,"last_error":lastErr,"mode":"encrypted-backup-one-workstation"})
  case "/api/neon/backup/enable":
   if r.Method!="POST"{fail(w,405,"Método no permitido");return true}
   conn,e:=rvCredential();if e!=nil{fail(w,400,"Vincula primero Neon");return true}
